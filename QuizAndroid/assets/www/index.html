@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1"> 
+<link href="css/jquery.mobile-1.3.1.css" rel="stylesheet" type="text/css" />
+<script type="text/javascript" src="js/jquery-1.8.2.js"></script>
+<script type="text/javascript" src="js/jquery.mobile-1.3.1.js"></script>
+<script type="text/javascript" src="js/cordova.js"></script>
+<style>
+section{
+	background-image:url(images/back02.jpg);
+	background-repeat:repeat-y;
+}
+.ui-icon-next{
+	background:url(images/next.png) no-repeat 50% 50%;
+	background-size:60%;
+	border:0px;
+	width:auto;
+}
+.ui-icon-submit{
+	background:url(images/submit.png) no-repeat 50% 50%;
+	background-size:60%;
+	border:0px;
+	width:auto;
+}
+
+.result img{
+	width:30px;
+	height:30px;
+	padding:1 px;}
+</style>
+<script type="text/javascript">
+
+	var token="";
+	var index=0;
+	var tId=1;
+	var answer="";
+	var correctNum=0;
+	var http = "http://192.168.1.61:8080/Quiz/rest";
+	
+	$(document).ready(function (){
+		initTopic();
+		
+		$(document).delegate("#topicList li","click", function (){
+			tId = $(this).find("input").val();
+			getQues(tId);
+		});
+		
+		$(document).delegate("#next","click", function(){
+			sendAnswer();
+		});
+		
+		$(document).delegate(".exit","click", function(){
+			navigator.app.exitApp();
+		});
+		
+		$(document).delegate(".backBtn","click", function(){
+			$.mobile.changePage('#main');
+			initTopic();
+		});
+	});
+	
+	
+	/* main page to get topic information from
+	 * the service and add the data into a listview
+	 */
+	function initTopic() {
+		
+		init();
+		$.get("http://192.168.1.61:8080/Quiz/rest/restService/getTopic",function(data) {
+			$("#topicList").empty();
+			var html = "";
+			$.each(data.topic, function(i, item){
+				html=html+"<li><a href=#quePage>"+item.tName+"</a><input type=hidden value="+item.tId+"><span class=ui-li-count>"+item.tAccuracy+"%</span></li>"
+			});
+			$("#topicList").append(html);
+			$("#topicList").listview("refresh");
+		}).fail(function() {
+		    alert( "server error, retry" );
+		  });
+	}
+	
+	/*
+	 *get ques by tId and save the questions into the cache of back in the server side
+	 */
+	function getQues(tId){
+		$.get("http://192.168.1.61:8080/Quiz/rest/restService/getQue",{"tId":tId}, function (data) {
+			token = data;
+			eachQue();
+		});
+	}
+	function eachQue(){
+		$.get("http://192.168.1.61:8080/Quiz/rest/restService/eachQue/"+token, {"index":index},function(data) {
+			$("#que legend").html(data.qName); //set question
+			$("label[for='optiona'] small").html(data.qOptiona);	//set option a
+			$("label[for='optionb'] small").html(data.qOptionb);	//set option b
+			$("label[for='optionc'] small").html(data.qOptionc);	//set option c
+			$("label[for='optiond'] small").html(data.qOptiond);	//set option d
+			
+			answer=data.qAnswer;
+		});
+	}
+	
+	function sendAnswer() {
+		var option = $("input[type=radio]:checked").val();
+		if (option) {
+			var flag = option==answer;
+			if (index <4) {
+				$.get("http://192.168.1.61:8080/Quiz/rest/restService/answer/"+token,{"result":flag, "index":index}, function(data){
+					
+					//if save the result into the server success then next question else alert error
+					if (data){
+						index = index+1;
+						eachQue();				//get next question
+					} else {
+						alert("server error please retry");
+					}
+				});
+				
+				resultImg(flag);//set reuslt image
+				
+			}else if(index==4) {
+				$("#next").removeClass("ui-icon-next");
+				$("#next").addClass("ui-icon-submit");
+				index =index+1;
+				resultImg(flag);//set reuslt image
+			} else  {
+				alert("oops, you got "+ correctNum*20 +" score");
+				endCount();
+			}
+			
+		} else {
+			alert("please select");
+		}
+	}
+	
+	function resultImg(flag) {
+		
+		var src = flag?"images/smile.png":"images/cry.png";
+		correctNum = flag?correctNum+1:correctNum;
+		var img="<img src="+src+" />";
+		$(".result").append(img);
+		
+	}
+	
+	function endCount(){
+		$.get("http://192.168.1.61:8080/Quiz/rest/restService/result/"+token,function(data) {
+			//init();
+		});
+		
+	}
+	
+	function init(){
+		index = 0;
+		token="";
+		answer="";
+		correctNum=0;
+		$("#next").removeClass("ui-icon-submit");
+		$("#next").addClass("ui-icon-next");
+		$(".result").empty();
+	}
+	
+</script>
+</head>
+<body>
+    <section data-role=page id=main>
+        <header data-role=header data-theme=b>
+        	<h1>Welcome</h1>
+        	<a href="#mainPanel" data-role="button" data-icon="arrow-r" data-inset="true" data-iconpos="notext" class="ui-btn-right">right</a>
+        </header>
+        <article data-role=content>
+             <h1>Please chose the topic:</h1>
+             <ul data-role=listview data-inset=true id=topicList>
+                
+             </ul> 
+        </article>
+        <footer data-role=footer data-theme=b data-position=fixed>
+            <h1>Matrix-global</h1>
+        </footer>
+        <div data-role="panel" id="mainPanel" data-position="right">
+        	<a href="#" data-role="button" class="exit" >Exit Quiz</a>
+        </div>
+    </section>
+
+    <section data-role=page id=quePage>
+        <header data-role=header data-theme=b >
+        	<h1>Welcome</h1>
+        	<a href="#quePanel" data-role="button" data-icon="arrow-r" data-inset="true" data-iconpos="notext" class="ui-btn-right">right</a>
+        </header>
+        <article data-role=content>
+            <div data-role=fieldcontain>
+            	<fieldset data-role="controlgroup" id="que">
+            		<legend></legend>
+					<input type='radio' id='optiona' name='option' value='A'/>
+					<label for='optiona'><small></small></label>
+					<input type='radio' id='optionb' name='option' value='B'/>
+					<label for='optionb'><small></small></label>
+					<input type='radio' id='optionc' name='option' value='C'/>
+					<label for='optionc'><small></small></label>
+					<input type='radio' id='optiond' name='option' value='D'/>
+					<label for='optiond'><small></small></label>
+            	</fieldset>
+            	<a href='#' data-role='button' data-inline='true' id="next" class="ui-icon-next ui-btn-active ui-state-persist"></a>
+            </div>
+            <div data-role="fieldcontain" class="result">
+            	
+            </div>
+        </article> 
+        <footer data-role=footer data-theme=b data-position=fixed>
+            <h1>Matrix-global</h1>
+        </footer>
+        
+        <div data-role="panel" id="quePanel" data-position="right">
+	    	<div data-role="controlgroup">
+		    	<a href="#" data-role="button" class="backBtn">Back Home</a>
+		    	<a href="#" data-role="button" class="exit">Exit Quiz</a>
+	    	</div>
+        </div>
+    </section>
+
+</body>
+</html>
